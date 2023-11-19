@@ -13,36 +13,42 @@ class SlideShow:
         #parameters
         self.monitor = get_monitors()[-1]
         self.root = tk.Tk()
-        self.fullscreen = True
+        self.isFullscreen = True
         self.isPaused = False
         self.index = -1
         self._after_id = None
-        self.slideDelay = 20000
+        self.slideDelay = 22000
+        self.nameDisplayDuration = 1500
         #root appearance
         self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}")
         self.root.state('zoomed')
-        self.root.attributes('-fullscreen', self.fullscreen)
+        self.root.attributes('-fullscreen', self.isFullscreen)
         #image
         self.foldePath = folder_path
         self.imageList = getImageList(self.foldePath)
-        self.imageLabel = None
+        self.imageLabel = tk.Label(self.root, bg='black')
+        self.imageLabel.pack(fill='both', expand=True)
+        self.image = None
         self.imageNameLabel = None
         #binds
+        self.set_binds()
+        #start
+        startEvent = tk.Event()
+        startEvent.keysym = "Right"
+        self.bind_loadNewImage(startEvent)
+        self.root.mainloop()
+    
+    def set_binds(self):
         self.root.bind('<Escape>', lambda event: self.root.quit())
         self.root.bind("<F11>", self.bind_toggleFullscreen)
         self.root.bind("<space>", self.bind_togglePause)
         self.root.bind("<Right>", lambda event: self.bind_loadNewImage(event))
         self.root.bind("<Left>", lambda event: self.bind_loadNewImage(event))
         self.root.bind("<Up>", lambda event: self.bind_showImageName(event))
-        #start
-        startEvent = tk.Event()
-        startEvent.keysym = "Right"
-        self.bind_loadNewImage(startEvent)
-        self.root.mainloop()
         
     def bind_toggleFullscreen(self, event):
-        self.fullscreen = not(self.fullscreen)
-        self.root.attributes('-fullscreen', self.fullscreen)
+        self.isFullscreen = not(self.isFullscreen)
+        self.root.attributes('-fullscreen', self.isFullscreen)
         
     def bind_togglePause(self, event):
         self.isPaused = not self.isPaused
@@ -59,34 +65,50 @@ class SlideShow:
             bg="black",
         )
         self.imageNameLabel.place(
-            relx=0.5, rely=0.98, anchor="s"
+            relx=0.5, rely=0.978, anchor="s"
         )
-        self.root.after(1200, self.imageNameLabel.destroy)
+        self.root.after(self.nameDisplayDuration, self.imageNameLabel.destroy)
         
     def bind_loadNewImage(self, event):
         if self._after_id is not None:
             self.root.after_cancel(self._after_id)
         if not self.isPaused or event is not None:
-            if event is None or event.keysym == "Right":
-                self.index += 1
+            next_index = self.index + 1 if event is None or event.keysym == "Right" else self.index - 1
+            self.index = next_index % len(self.imageList)
+            nextImage = self.getImage()
+            if self.image is not None:
+                self.fadeImageOutThenIn(255, nextImage)
             else:
-                self.index -= 1
-            if self.imageLabel:
-                self.imageLabel.destroy()
-            imagePath = self.getImage()
-            image = Image.open(imagePath)
-            resizedImage = resize(image, self.monitor)
-            photo = ImageTk.PhotoImage(resizedImage)
-            self.imageLabel = tk.Label(self.root, image=photo, bg='black')
-            self.imageLabel.photo = photo
-            self.imageLabel.pack(fill='both', expand=True)
+                self.image = nextImage
+                self.fadeInImage(0)
         self._after_id = self.root.after(self.slideDelay, self.bind_loadNewImage, None)
         
     def getImage(self):
-        image = self.imageList[self.index]
-        imagePath = os.path.join(self.foldePath, image)
-        return imagePath
-        
+        imageName = self.imageList[self.index]
+        imagePath = os.path.join(self.foldePath, imageName)
+        image = Image.open(imagePath)
+        resizedImage = resize(image, self.monitor)
+        return resizedImage     
+    
+    def fadeImageOutThenIn(self, alpha, nextImage):
+        self.image.putalpha(alpha)
+        photo = ImageTk.PhotoImage(self.image)
+        self.imageLabel.configure(image=photo)
+        self.imageLabel.photo = photo
+        if alpha > 1:
+            self.root.after(2, self.fadeImageOutThenIn, max(0, alpha - 24), nextImage)
+        else:
+            self.image = nextImage
+            self.fadeInImage(0)
+    
+    def fadeInImage(self, alpha):
+        self.image.putalpha(alpha)
+        photo = ImageTk.PhotoImage(self.image)
+        self.imageLabel.configure(image=photo)
+        self.imageLabel.photo = photo
+        if alpha < 254:
+            self.root.after(10, self.fadeInImage, min(255, alpha + 8))
+    
 def getImageList(file_path):
     imageList = list()
     for file in os.listdir(file_path):
