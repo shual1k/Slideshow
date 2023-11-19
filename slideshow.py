@@ -10,27 +10,31 @@ ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
 class SlideShow:
     def __init__(self, folder_path):
+        #parameters
         self.monitor = get_monitors()[-1]
         self.root = tk.Tk()
         self.fullscreen = True
         self.isPaused = False
         self.index = -1
         self._after_id = None
-        self.slideDelay = 10000
+        self.slideDelay = 20000
+        #root appearance
         self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}")
         self.root.state('zoomed')
         self.root.attributes('-fullscreen', self.fullscreen)
-        
+        #image
         self.foldePath = folder_path
         self.imageList = getImageList(self.foldePath)
         self.imageLabel = None
-        
+        self.imageNameLabel = None
+        #binds
         self.root.bind('<Escape>', lambda event: self.root.quit())
         self.root.bind("<F11>", self.bind_toggleFullscreen)
         self.root.bind("<space>", self.bind_togglePause)
         self.root.bind("<Right>", lambda event: self.bind_loadNewImage(event))
         self.root.bind("<Left>", lambda event: self.bind_loadNewImage(event))
-        
+        self.root.bind("<Up>", lambda event: self.bind_showImageName(event))
+        #start
         startEvent = tk.Event()
         startEvent.keysym = "Right"
         self.bind_loadNewImage(startEvent)
@@ -42,6 +46,22 @@ class SlideShow:
         
     def bind_togglePause(self, event):
         self.isPaused = not self.isPaused
+        
+    def bind_showImageName(self, event):
+        if self.imageNameLabel:
+            self.imageNameLabel.destroy()
+        image_name = self.imageList[self.index]
+        self.imageNameLabel = tk.Label(
+            self.root,
+            text=image_name,
+            font=("Helvetica bold", 18),
+            fg="light gray",
+            bg="black",
+        )
+        self.imageNameLabel.place(
+            relx=0.5, rely=0.98, anchor="s"
+        )
+        self.root.after(1200, self.imageNameLabel.destroy)
         
     def bind_loadNewImage(self, event):
         if self._after_id is not None:
@@ -79,11 +99,9 @@ def resize(image: Image, monitor):
     ratio = min((monitor.width / image.width), (monitor.height / image.height))
     newHeight = int(image.height * ratio)
     newWidth = int(image.width * ratio)
-    return image.resize((newWidth, newHeight), Image.ANTIALIAS) 
+    return image.resize((newWidth, newHeight), Image.Resampling.LANCZOS) 
 
-   
 def main():
-    folder_path = "C:/pathname"
     inputWindow = input.InputWindow()
     folder_path = inputWindow.input
     slideShow = SlideShow(folder_path)
