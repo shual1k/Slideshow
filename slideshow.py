@@ -9,8 +9,9 @@ ctypes.windll.shcore.SetProcessDpiAwareness(2)
 NAME_DURATION = 1500
 VISIBLE = 255
 INVISIBLE = 0
-VISIBILITY_TRANSITION = 9
-VIS_TRAN_DELAY = 3
+VISIBILITY_TRANSITION = 12
+VIS_TRAN_DELAY = 5
+ZOOM_DELTA = 0.1
 
 class SlideShow:
     def __init__(self, folderPath, imageList, slideDelay):
@@ -22,6 +23,7 @@ class SlideShow:
         self.index = -1
         self._after_id = None
         self.slideDelay = slideDelay * 1000
+        self.zoomFactor = 1.0
         #root appearance
         self.root.title("Slide Show")
         self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}")
@@ -61,6 +63,7 @@ class SlideShow:
         self.root.bind("<Right>", lambda event: self.bind_loadNewImage(event))
         self.root.bind("<Left>", lambda event: self.bind_loadNewImage(event))
         self.root.bind("<Up>", lambda event: self.bind_showImageName(event))
+        #self.root.bind("<Control-MouseWheel>", self.zoom)
      
     def bind_exit(self, event):
         if self._after_id is not None:
@@ -114,9 +117,15 @@ class SlideShow:
     
     def resize(self, image: Image):
         ratio = min((self.monitor.width / image.width), (self.monitor.height / image.height))
+        ratio = ratio * self.zoomFactor
         newHeight = int(image.height * ratio)
         newWidth = int(image.width * ratio)
         return image.resize((newWidth, newHeight), Image.Resampling.LANCZOS) 
+    
+    def zoom(self, event):
+        self.zoomFactor = round(self.zoomFactor + ZOOM_DELTA, 2)
+        (event.delta/120)
+        image = self.resize(self.currentImage)
     
     def fadeImageOutThenIn(self, currImgAlpha, nxtImgAlpha):
         #update alpha values
