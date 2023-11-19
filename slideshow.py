@@ -2,61 +2,78 @@ import tkinter as tk
 from tkinter import PhotoImage
 from screeninfo import get_monitors
 from PIL import Image, ImageTk
+import input
 import random
-import os   
+import os
+import ctypes
+ctypes.windll.shcore.SetProcessDpiAwareness(2)
 
 class SlideShow:
     def __init__(self, folder_path):
         self.monitor = get_monitors()[-1]
         self.root = tk.Tk()
         self.fullscreen = True
-        self.paused = False
+        self.isPaused = False
+        self.index = -1
+        self._after_id = None
+        self.slideDelay = 10000
         self.root.geometry(f"{self.monitor.width}x{self.monitor.height}+{self.monitor.x}+{self.monitor.y}")
+        self.root.state('zoomed')
         self.root.attributes('-fullscreen', self.fullscreen)
         
         self.foldePath = folder_path
         self.imageList = getImageList(self.foldePath)
         self.imageLabel = None
-        self.loadNewImage()
         
         self.root.bind('<Escape>', lambda event: self.root.quit())
-        self.root.bind("<F11>", self.toggleFullscreen)
-        self.root.bind("<space>", self.togglePause)
+        self.root.bind("<F11>", self.bind_toggleFullscreen)
+        self.root.bind("<space>", self.bind_togglePause)
+        self.root.bind("<Right>", lambda event: self.bind_loadNewImage(event))
+        self.root.bind("<Left>", lambda event: self.bind_loadNewImage(event))
         
+        startEvent = tk.Event()
+        startEvent.keysym = "Right"
+        self.bind_loadNewImage(startEvent)
         self.root.mainloop()
         
-    def toggleFullscreen(self, event):
+    def bind_toggleFullscreen(self, event):
         self.fullscreen = not(self.fullscreen)
         self.root.attributes('-fullscreen', self.fullscreen)
         
-    def togglePause(self, event):
-        self.paused = not self.paused
+    def bind_togglePause(self, event):
+        self.isPaused = not self.isPaused
         
-    def loadNewImage(self):
-        if not self.paused:
+    def bind_loadNewImage(self, event):
+        if self._after_id is not None:
+            self.root.after_cancel(self._after_id)
+        if not self.isPaused or event is not None:
+            if event is None or event.keysym == "Right":
+                self.index += 1
+            else:
+                self.index -= 1
             if self.imageLabel:
                 self.imageLabel.destroy()
-            randomImagePath = getRandomImage(self.imageList, self.foldePath)
-            image = Image.open(randomImagePath)
+            imagePath = self.getImage()
+            image = Image.open(imagePath)
             resizedImage = resize(image, self.monitor)
             photo = ImageTk.PhotoImage(resizedImage)
             self.imageLabel = tk.Label(self.root, image=photo, bg='black')
             self.imageLabel.photo = photo
             self.imageLabel.pack(fill='both', expand=True)
-        self.root.after(1000, self.loadNewImage)
+        self._after_id = self.root.after(self.slideDelay, self.bind_loadNewImage, None)
         
-    
+    def getImage(self):
+        image = self.imageList[self.index]
+        imagePath = os.path.join(self.foldePath, image)
+        return imagePath
+        
 def getImageList(file_path):
     imageList = list()
     for file in os.listdir(file_path):
         if file.endswith(".png") or file.endswith(".jpg") or file.endswith(".jpeg"):
             imageList.append(file)
+    imageList = random.sample(imageList, len(imageList))
     return imageList
-  
-def getRandomImage(imageList, file_path):
-    randomImage = random.choice(imageList)
-    randomImagePath = os.path.join(file_path, randomImage)
-    return randomImagePath
 
 def resize(image: Image, monitor):
     ratio = min((monitor.width / image.width), (monitor.height / image.height))
@@ -64,5 +81,12 @@ def resize(image: Image, monitor):
     newWidth = int(image.width * ratio)
     return image.resize((newWidth, newHeight), Image.ANTIALIAS) 
 
-folder_path = 'C:/pathname'
-slideShow = SlideShow(folder_path)
+   
+def main():
+    folder_path = "C:/pathname"
+    inputWindow = input.InputWindow()
+    folder_path = inputWindow.input
+    slideShow = SlideShow(folder_path)
+
+if __name__ == "__main__":
+    main()
